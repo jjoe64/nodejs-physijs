@@ -1,16 +1,46 @@
-//'use strict';
+'use strict';
 
-THREE = require('./three.js');
+var THREE = require('./three.js');
+var Ammo = require('../../Physijs/ammo.js');
+var Physijs = require('../../Physijs/physi.js')(THREE, Ammo);
 
-var Physijs = require('./physiNode/physi.js');
-require('./physiNode/physijs_worker.js');
+
+
+//var Physijs = require('./physiNode/physi.js');
+//physijs_worker_functions = require('./physiNode/physijs_worker.js');
 
 /////////////////
 // game
 
-
-
-
+	var initScene, render, renderer, scene, camera, box_falling;
+	
+	initScene = function() {
+		
+		scene = new Physijs.Scene;
+		
+		// Box
+		box_falling = new Physijs.BoxMesh(
+			new THREE.CubeGeometry( 5, 5, 5 ),
+			new THREE.MeshBasicMaterial({ color: 0x888888 })
+		);
+		scene.add( box_falling );
+		
+		// Box
+		var box = new Physijs.BoxMesh(
+			new THREE.CubeGeometry( 5, 5, 5 ),
+			new THREE.MeshBasicMaterial({ color: 0x880088 }),
+			0
+		);
+		box.position.y = -20;
+		scene.add( box );
+		
+		setTimeout( render, 200 );
+	};
+	
+	render = function() {
+		scene.simulate(); // run physics
+		setTimeout( render, 200 );
+	};
 
 
 //////////////////
@@ -84,5 +114,6 @@ var io = require('socket.io').listen(8088);
 		doTick.call(_this);
 	}, TICK_RATE);
 
+initScene();
 })();
 

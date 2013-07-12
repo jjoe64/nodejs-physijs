@@ -512,7 +512,6 @@ window.Physijs = (function() {
 
 			console.log(data[offset+2])
 
-			/*
 			if ( object.__dirtyPosition === false ) {
 				object.position.set(
 					data[ offset + 1 ],
@@ -520,7 +519,6 @@ window.Physijs = (function() {
 					data[ offset + 3 ]
 				);
 			}
-				*/
 
 			if ( object.__dirtyRotation === false ) {
 				if ( object.useQuaternion ) {
