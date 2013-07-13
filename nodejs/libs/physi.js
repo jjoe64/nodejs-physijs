@@ -1,6 +1,6 @@
 'use strict';
 
-var Physijs = (function() {
+module.exports = function(THREE, Ammo) {
 	var THREE_REVISION = parseInt( THREE.REVISION, 10 ),
 		SUPPORT_TRANSFERABLE,
 		_matrix = new THREE.Matrix4, _is_simulating = false,
@@ -393,9 +393,7 @@ var Physijs = (function() {
 		Eventable.call( this );
 		THREE.Scene.call( this );
 
-		
-		//this._worker.onmessage
-		this.onmessage = function ( event ) {
+		var workerToSceneMessageHandler = function ( event ) {
 			var _temp,
 				data = event.data;
 
@@ -477,8 +475,16 @@ var Physijs = (function() {
 			}
 		};
 
-		this._worker = physijs_worker_functions(this.onmessage); //new Worker( Physijs.scripts.worker || 'physijs_worker.js' );
-		this._worker.transferableMessage = this._worker.onmessage; //this._worker.webkitPostMessage || this._worker.postMessage;
+		//this._worker = new Worker( Physijs.scripts.worker || 'physijs_worker.js' );
+		//this._worker.transferableMessage = this._worker.webkitPostMessage || this._worker.postMessage;
+		
+		this._worker = require('./physijs_worker.js')(workerToSceneMessageHandler, Ammo);
+		var _worker = this._worker;
+		this._worker.postMessage = function(x) {
+			_worker.sceneToWorkerMessageHandler({data:x});
+		};
+		this._worker.transferableMessage = this._worker.postMessage;
+		
 		this._materials = {};
 		this._objects = {};
 		this._vehicles = {};
@@ -486,8 +492,7 @@ var Physijs = (function() {
 
 		var ab = new ArrayBuffer( 1 );
 		this._worker.transferableMessage( ab, [ab] );
-		SUPPORT_TRANSFERABLE = false; //( ab.byteLength === 0 );
-
+		SUPPORT_TRANSFERABLE = ( ab.byteLength === 0 );
 
 		params = params || {};
 		params.ammo = Physijs.scripts.ammo || 'ammo.js';
@@ -511,6 +516,8 @@ var Physijs = (function() {
 			if ( object === undefined ) {
 				continue;
 			}
+			
+			console.log(data[offset+2])
 
 			if ( object.__dirtyPosition === false ) {
 				object.position.set(
@@ -796,7 +803,7 @@ var Physijs = (function() {
 	};
 
 	Physijs.Scene.prototype.execute = function( cmd, params ) {
-		physijs_worker_functions[cmd](params);
+		this._worker.postMessage({ cmd: cmd, params: params });
 	};
 
 	addObjectChildren = function( parent, object ) {
@@ -1400,6 +1407,5 @@ var Physijs = (function() {
 	};
 
 	return Physijs;
-})();
+}
 
-if (typeof(module) !== 'undefined' && typeof(module.exports) !== 'undefined') { module.exports = Physijs; }

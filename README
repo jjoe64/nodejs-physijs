@@ -1,0 +1,19 @@
+THREE.js + physijs on node.js
+===============================
+
+run physical engine server-side with node.js.
+
+About this project
+-------------------
+There are 2 sub directories (browser + node). Both apps are the same example. There
+is a falling box, that lands on another box. It's just a trivial physical demo.
+
+The libraries in "browser/libs" are original from three/physijs (except the log).
+But the libraries in "node/libs" are modified to work with node.js.
+
+
+Requirements
+=============
+you need socket.io
+> $ npm install -g socket.io
+

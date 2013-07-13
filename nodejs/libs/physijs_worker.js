@@ -1,9 +1,9 @@
 'use strict';
-
-var physijs_worker_functions = function(sceneOnMessage){
+module.exports = function(workerToSceneMessageHandler, Ammo) {
 	var	
-		transferableMessage = sceneOnMessage; //self.webkitPostMessage || self.postMessage,
-		
+		//transferableMessage = self.webkitPostMessage || self.postMessage,
+		transferableMessage = function(x) {workerToSceneMessageHandler({data:x})},
+	
 		// enum
 		MESSAGE_TYPES = {
 			WORLDREPORT: 0,
@@ -11,12 +11,12 @@ var physijs_worker_functions = function(sceneOnMessage){
 			VEHICLEREPORT: 2,
 			CONSTRAINTREPORT: 3
 		},
-		
+	
 		// temp variables
 		_object,
 		_vector,
 		_transform,
-		
+	
 		// functions
 		public_functions = {},
 		getShapeFromCache,
@@ -26,7 +26,7 @@ var physijs_worker_functions = function(sceneOnMessage){
 		reportVehicles,
 		reportCollisions,
 		reportConstraints,
-		
+	
 		// world variables
 		fixedTimeStep, // used when calling stepSimulation
 		rateLimit, // sets whether or not to sync the simulation rate with fixedTimeStep
@@ -48,10 +48,10 @@ var physijs_worker_functions = function(sceneOnMessage){
 		_num_wheels = 0,
 		_num_constraints = 0,
 		_object_shapes = {},
-		
+	
 		// object reporting
 		REPORT_CHUNKSIZE, // report array is increased in increments of this chunk size
-		
+	
 		WORLDREPORT_ITEMSIZE = 14, // how many float values each reported item needs
 		worldreport,
 
@@ -67,7 +67,7 @@ var physijs_worker_functions = function(sceneOnMessage){
 	var ab = new ArrayBuffer( 1 );
 
 	transferableMessage( ab, [ab] );
-	var SUPPORT_TRANSFERABLE = false; //( ab.byteLength === 0 );
+	var SUPPORT_TRANSFERABLE = ( ab.byteLength === 0 );
 
 	getShapeFromCache = function ( cache_key ) {
 		if ( _object_shapes[ cache_key ] !== undefined ) {
@@ -82,7 +82,7 @@ var physijs_worker_functions = function(sceneOnMessage){
 
 	createShape = function( description ) {
 		var cache_key, shape;
-		
+	
 		_transform.setIdentity();
 		switch ( description.type ) {
 			case 'plane':
@@ -95,7 +95,7 @@ var physijs_worker_functions = function(sceneOnMessage){
 					setShapeCache( cache_key, shape );
 				}
 				break;
-			
+		
 			case 'box':
 				cache_key = 'box_' + description.width + '_' + description.height + '_' + description.depth;
 				if ( ( shape = getShapeFromCache( cache_key ) ) === null ) {
@@ -106,7 +106,7 @@ var physijs_worker_functions = function(sceneOnMessage){
 					setShapeCache( cache_key, shape );
 				}
 				break;
-			
+		
 			case 'sphere':
 				cache_key = 'sphere_' + description.radius;
 				if ( ( shape = getShapeFromCache( cache_key ) ) === null ) {
@@ -114,7 +114,7 @@ var physijs_worker_functions = function(sceneOnMessage){
 					setShapeCache( cache_key, shape );
 				}
 				break;
-			
+		
 			case 'cylinder':
 				cache_key = 'cylinder_' + description.width + '_' + description.height + '_' + description.depth;
 				if ( ( shape = getShapeFromCache( cache_key ) ) === null ) {
@@ -125,7 +125,7 @@ var physijs_worker_functions = function(sceneOnMessage){
 					setShapeCache( cache_key, shape );
 				}
 				break;
-			
+		
 			case 'capsule':
 				cache_key = 'capsule_' + description.radius + '_' + description.height;
 				if ( ( shape = getShapeFromCache( cache_key ) ) === null ) {
@@ -134,7 +134,7 @@ var physijs_worker_functions = function(sceneOnMessage){
 					setShapeCache( cache_key, shape );
 				}
 				break;
-			
+		
 			case 'cone':
 				cache_key = 'cone_' + description.radius + '_' + description.height;
 				if ( ( shape = getShapeFromCache( cache_key ) ) === null ) {
@@ -142,14 +142,14 @@ var physijs_worker_functions = function(sceneOnMessage){
 					setShapeCache( cache_key, shape );
 				}
 				break;
-			
+		
 			case 'concave':
 				var i, triangle, triangle_mesh = new Ammo.btTriangleMesh;
 				if (!description.triangles.length) return false
 
 				for ( i = 0; i < description.triangles.length; i++ ) {
 					triangle = description.triangles[i];
-					
+				
 					_vec3_1.setX(triangle[0].x);
 					_vec3_1.setY(triangle[0].y);
 					_vec3_1.setZ(triangle[0].z);
@@ -161,7 +161,7 @@ var physijs_worker_functions = function(sceneOnMessage){
 					_vec3_3.setX(triangle[2].x);
 					_vec3_3.setY(triangle[2].y);
 					_vec3_3.setZ(triangle[2].z);
-					
+				
 					triangle_mesh.addTriangle(
 						_vec3_1,
 						_vec3_2,
@@ -176,18 +176,18 @@ var physijs_worker_functions = function(sceneOnMessage){
 					true
 				);
 				break;
-			
+		
 			case 'convex':
 				var i, point, shape = new Ammo.btConvexHullShape;
 				for ( i = 0; i < description.points.length; i++ ) {
 					point = description.points[i];
-					
+				
 					_vec3_1.setX(point.x);
 					_vec3_1.setY(point.y);
 					_vec3_1.setZ(point.z);
 
 					shape.addPoint(_vec3_1);
-					
+				
 				}
 				break;
 
@@ -214,28 +214,28 @@ var physijs_worker_functions = function(sceneOnMessage){
 				_vec3_1.setX(description.xsize/(description.xpts - 1));
 				_vec3_1.setY(description.ysize/(description.ypts - 1));
 				_vec3_1.setZ(1);
-				
+			
 				shape.setLocalScaling(_vec3_1);
 				break;
-			
+		
 			default:
 				// Not recognized
 				return;
 				break;
 		}
-		
+	
 		return shape;
 	};
 
 	public_functions.init = function( params ) {
-		importScripts( params.ammo );
-		
+		//importScripts( params.ammo );
+	
 		_transform = new Ammo.btTransform;
 		_vec3_1 = new Ammo.btVector3(0,0,0);
 		_vec3_2 = new Ammo.btVector3(0,0,0);
 		_vec3_3 = new Ammo.btVector3(0,0,0);
 		_quat = new Ammo.btQuaternion(0,0,0,0);
-		
+	
 		REPORT_CHUNKSIZE = params.reportsize || 50;
 		if ( SUPPORT_TRANSFERABLE ) {
 			// Transferable messages are supported, take advantage of them with TypedArrays
@@ -254,39 +254,39 @@ var physijs_worker_functions = function(sceneOnMessage){
 		collisionreport[0] = MESSAGE_TYPES.COLLISIONREPORT;
 		vehiclereport[0] = MESSAGE_TYPES.VEHICLEREPORT;
 		constraintreport[0] = MESSAGE_TYPES.CONSTRAINTREPORT;
-		
+	
 		var collisionConfiguration = new Ammo.btDefaultCollisionConfiguration,
 			dispatcher = new Ammo.btCollisionDispatcher( collisionConfiguration ),
 			solver = new Ammo.btSequentialImpulseConstraintSolver,
 			broadphase;
-		
+	
 		if ( !params.broadphase ) params.broadphase = { type: 'dynamic' };
 		switch ( params.broadphase.type ) {
 			case 'sweepprune':
-				
+			
 				_vec3_1.setX(params.broadphase.aabbmin.x);
 				_vec3_1.setY(params.broadphase.aabbmin.y);
 				_vec3_1.setZ(params.broadphase.aabbmin.z);
-				
+			
 				_vec3_2.setX(params.broadphase.aabbmax.x);
 				_vec3_2.setY(params.broadphase.aabbmax.y);
 				_vec3_2.setZ(params.broadphase.aabbmax.z);
-				
+			
 				broadphase = new Ammo.btAxisSweep3(
 					_vec3_1,
 					_vec3_2
 				);
-				
-				break;
 			
+				break;
+		
 			case 'dynamic':
 			default:
 				broadphase = new Ammo.btDbvtBroadphase;
 				break;
 		}
-		
+	
 		world = new Ammo.btDiscreteDynamicsWorld( dispatcher, broadphase, solver, collisionConfiguration );
-		
+	
 		fixedTimeStep = params.fixedTimeStep;
 		rateLimit = params.rateLimit;
 
@@ -309,7 +309,7 @@ var physijs_worker_functions = function(sceneOnMessage){
 	};
 
 	public_functions.addObject = function( description ) {
-		
+	
 		var i,
 		localInertia, shape, motionState, rbInfo, body;
 
@@ -319,72 +319,72 @@ var physijs_worker_functions = function(sceneOnMessage){
 	if ( description.children ) {
 		var compound_shape = new Ammo.btCompoundShape, _child;
 		compound_shape.addChildShape( _transform, shape );
-		
+	
 		for ( i = 0; i < description.children.length; i++ ) {
 			_child = description.children[i];
-			
+		
 			var trans = new Ammo.btTransform;
 			trans.setIdentity();
-			
+		
 			_vec3_1.setX(_child.position_offset.x);
 			_vec3_1.setY(_child.position_offset.y);
 			_vec3_1.setZ(_child.position_offset.z);
 			trans.setOrigin(_vec3_1); 
-			
+		
 			_quat.setX(_child.rotation.x);
 			_quat.setY(_child.rotation.y);
 			_quat.setZ(_child.rotation.z);
 			_quat.setW(_child.rotation.w);
 			trans.setRotation(_quat); 
-			
+		
 			shape = createShape( description.children[i] );
 			compound_shape.addChildShape( trans, shape );
 			Ammo.destroy(trans);
 		}
-		
+	
 		shape = compound_shape;
 		}
 		_vec3_1.setX(0);
 		_vec3_1.setY(0);
 		_vec3_1.setZ(0);
 		shape.calculateLocalInertia( description.mass, _vec3_1 );
-		
+	
 		_transform.setIdentity();
-		
+	
 		_vec3_2.setX(description.position.x);
 		_vec3_2.setY(description.position.y);
 		_vec3_2.setZ(description.position.z);
 		_transform.setOrigin(_vec3_2);
-		
+	
 		_quat.setX(description.rotation.x);
 		_quat.setY(description.rotation.y);
 		_quat.setZ(description.rotation.z);
 		_quat.setW(description.rotation.w);
 		_transform.setRotation(_quat);
-		
+	
 		motionState = new Ammo.btDefaultMotionState( _transform ); // #TODO: btDefaultMotionState supports center of mass offset as second argument - implement
 		rbInfo = new Ammo.btRigidBodyConstructionInfo( description.mass, motionState, shape, _vec3_1 );
-		
+	
 		if ( description.materialId !== undefined ) {
 			rbInfo.set_m_friction( _materials[ description.materialId ].friction );
 			rbInfo.set_m_restitution( _materials[ description.materialId ].restitution );
 		}
-		
+	
 		body = new Ammo.btRigidBody( rbInfo );
-		
+	
 		if ( typeof description.collision_flags !== 'undefined' ) {
 			body.setCollisionFlags( description.collision_flags );
 		}
-		
+	
 		world.addRigidBody( body );
-		
+	
 		body.id = description.id;
 		_objects[ body.id ] = body;
-		
+	
 		var ptr = body.a != undefined ? body.a : body.ptr;
 		_objects_ammo[ptr] = body.id;
 		_num_objects++;
-		
+	
 		transferableMessage({ cmd: 'objectReady', params: body.id });
 	};
 
@@ -422,19 +422,19 @@ var physijs_worker_functions = function(sceneOnMessage){
 				tuning.set_m_maxSuspensionTravelCm( description.tuning.max_suspension_travel );
 				tuning.set_m_maxSuspensionForce( description.tuning.max_suspension_force );
 			}
-			
+		
 			_vec3_1.setX(description.connection_point.x);
 			_vec3_1.setY(description.connection_point.y);
 			_vec3_1.setZ(description.connection_point.z);
-			
+		
 			_vec3_2.setX(description.wheel_direction.x);
 			_vec3_2.setY(description.wheel_direction.y);
 			_vec3_2.setZ(description.wheel_direction.z);
-			
+		
 			_vec3_3.setX(description.wheel_axle.x);
 			_vec3_3.setY(description.wheel_axle.y);
 			_vec3_3.setZ(description.wheel_axle.z);
-			
+		
 			_vehicles[description.id].addWheel(
 				_vec3_1,
 				_vec3_2,
@@ -481,14 +481,14 @@ var physijs_worker_functions = function(sceneOnMessage){
 	public_functions.updateTransform = function( details ) {
 		_object = _objects[details.id];
 		_object.getMotionState().getWorldTransform( _transform );
-		
+	
 		if ( details.pos ) {
 			_vec3_1.setX(details.pos.x);
 			_vec3_1.setY(details.pos.y);
 			_vec3_1.setZ(details.pos.z);
 			_transform.setOrigin(_vec3_1);
 		}
-		
+	
 		if ( details.quat ) {
 			_quat.setX(details.quat.x);
 			_quat.setY(details.quat.y);
@@ -496,7 +496,7 @@ var physijs_worker_functions = function(sceneOnMessage){
 			_quat.setW(details.quat.w);
 			_transform.setRotation(_quat);
 		}
-		
+	
 		_object.setWorldTransform( _transform );
 		_object.activate();
 	};
@@ -504,25 +504,25 @@ var physijs_worker_functions = function(sceneOnMessage){
 	public_functions.updateMass = function( details ) {
 		// #TODO: changing a static object into dynamic is buggy
 		_object = _objects[details.id];
-		
+	
 		// Per http://www.bulletphysics.org/Bullet/phpBB3/viewtopic.php?p=&f=9&t=3663#p13816
 		world.removeRigidBody( _object );
-		
+	
 		_vec3_1.setX(0);
 		_vec3_1.setY(0);
 		_vec3_1.setZ(0);
-		
+	
 		_object.setMassProps( details.mass, _vec3_1 );
 		world.addRigidBody( _object );
 		_object.activate();
 	};
 
 	public_functions.applyCentralImpulse = function ( details ) {
-		
+	
 		_vec3_1.setX(details.x);
 		_vec3_1.setY(details.y);
 		_vec3_1.setZ(details.z);
-		
+	
 		_objects[details.id].applyCentralImpulse(_vec3_1);
 		_objects[details.id].activate();
 	};
@@ -532,7 +532,7 @@ var physijs_worker_functions = function(sceneOnMessage){
 		_vec3_1.setX(details.impulse_x);
 		_vec3_1.setY(details.impulse_y);
 		_vec3_1.setZ(details.impulse_z);
-		
+	
 		_vec3_2.setX(details.x);
 		_vec3_2.setY(details.y);
 		_vec3_2.setZ(details.z);
@@ -545,25 +545,25 @@ var physijs_worker_functions = function(sceneOnMessage){
 	};
 
 	public_functions.applyCentralForce = function ( details ) {
-		
+	
 		_vec3_1.setX(details.x);
 		_vec3_1.setY(details.y);
 		_vec3_1.setZ(details.z);
-		
+	
 		_objects[details.id].applyCentralForce(_vec3_1);
 		_objects[details.id].activate();
 	};
 
 	public_functions.applyForce = function ( details ) {
-		
+	
 		_vec3_1.setX(details.impulse_x);
 		_vec3_1.setY(details.impulse_y);
 		_vec3_1.setZ(details.impulse_z);
-		
+	
 		_vec3_2.setX(details.x);
 		_vec3_2.setY(details.y);
 		_vec3_2.setZ(details.z);
-		
+	
 		_objects[details.id].applyForce(
 			_vec3_1,
 			_vec3_2
@@ -576,7 +576,7 @@ var physijs_worker_functions = function(sceneOnMessage){
 		_vec3_1.setX(details.x);
 		_vec3_1.setY(details.y);
 		_vec3_1.setZ(details.z);
-		
+	
 		_objects[details.id].setAngularVelocity(
 			_vec3_1
 		);
@@ -588,7 +588,7 @@ var physijs_worker_functions = function(sceneOnMessage){
 		_vec3_1.setX(details.x);
 		_vec3_1.setY(details.y);
 		_vec3_1.setZ(details.z);
-		
+	
 		_objects[details.id].setLinearVelocity(
 			_vec3_1
 		);
@@ -600,7 +600,7 @@ var physijs_worker_functions = function(sceneOnMessage){
 		_vec3_1.setX(details.x);
 		_vec3_1.setY(details.y);
 		_vec3_1.setZ(details.z);
-		
+	
 		_objects[details.id].setAngularFactor(
 				_vec3_1
 		);
@@ -611,7 +611,7 @@ var physijs_worker_functions = function(sceneOnMessage){
 		_vec3_1.setX(details.x);
 		_vec3_1.setY(details.y);
 		_vec3_1.setZ(details.z);
-		
+	
 		_objects[details.id].setLinearFactor(
 			_vec3_1
 		);
@@ -633,28 +633,28 @@ var physijs_worker_functions = function(sceneOnMessage){
 		var constraint;
 
 		switch ( details.type ) {
-			
+		
 			case 'point':
 				if ( details.objectb === undefined ) {
-					
+				
 					_vec3_1.setX(details.positiona.x);
 					_vec3_1.setY(details.positiona.y);
 					_vec3_1.setZ(details.positiona.z);
-					
+				
 					constraint = new Ammo.btPoint2PointConstraint(
 						_objects[ details.objecta ],
 						_vec3_1
 					);
 				} else {
-					
+				
 					_vec3_1.setX(details.positiona.x);
 					_vec3_1.setY(details.positiona.y);
 					_vec3_1.setZ(details.positiona.z);
-					
+				
 					_vec3_2.setX(details.positionb.x);
 					_vec3_2.setY(details.positionb.y);
 					_vec3_2.setZ(details.positionb.z);
-					
+				
 					constraint = new Ammo.btPoint2PointConstraint(
 						_objects[ details.objecta ],
 						_objects[ details.objectb ],
@@ -663,29 +663,29 @@ var physijs_worker_functions = function(sceneOnMessage){
 					);
 				}
 				break;
-			
+		
 			case 'hinge':
 				if ( details.objectb === undefined ) {
-					
+				
 					_vec3_1.setX(details.positiona.x);
 					_vec3_1.setY(details.positiona.y);
 					_vec3_1.setZ(details.positiona.z);
-					
+				
 					_vec3_2.setX(details.axis.x);
 					_vec3_2.setY(details.axis.y);
 					_vec3_2.setZ(details.axis.z);
-					
+				
 					constraint = new Ammo.btHingeConstraint(
 						_objects[ details.objecta ],
 						_vec3_1,
 						_vec3_2
 					);
 				} else {
-					
+				
 					_vec3_1.setX(details.positiona.x);
 					_vec3_1.setY(details.positiona.y);
 					_vec3_1.setZ(details.positiona.z);
-					
+				
 					_vec3_2.setX(details.positionb.x);
 					_vec3_2.setY(details.positionb.y);
 					_vec3_2.setZ(details.positionb.z);
@@ -693,7 +693,7 @@ var physijs_worker_functions = function(sceneOnMessage){
 					_vec3_3.setX(details.axis.x);
 					_vec3_3.setY(details.axis.y);
 					_vec3_3.setZ(details.axis.z);
-					
+				
 					constraint = new Ammo.btHingeConstraint(
 						_objects[ details.objecta ],
 						_objects[ details.objectb ],
@@ -704,22 +704,22 @@ var physijs_worker_functions = function(sceneOnMessage){
 					);
 				}
 				break;
-			
+		
 			case 'slider':
 				var transforma, transformb, rotation;
-			
+		
 				transforma = new Ammo.btTransform();
-				
+			
 				_vec3_1.setX(details.positiona.x);
 				_vec3_1.setY(details.positiona.y);
 				_vec3_1.setZ(details.positiona.z);
-				
+			
 				transforma.setOrigin(_vec3_1);
-				
+			
 				var rotation = transforma.getRotation();
 				rotation.setEuler( details.axis.x, details.axis.y, details.axis.z );
 				transforma.setRotation( rotation );
-				
+			
 				if ( details.objectb ) {
 					transformb = new Ammo.btTransform();
 
@@ -728,11 +728,11 @@ var physijs_worker_functions = function(sceneOnMessage){
 					_vec3_2.setZ(details.positionb.z);
 
 					transformb.setOrigin(_vec3_2);
-					
+				
 					rotation = transformb.getRotation();
 					rotation.setEuler( details.axis.x, details.axis.y, details.axis.z );
 					transformb.setRotation( rotation );
-					
+				
 					constraint = new Ammo.btSliderConstraint(
 						_objects[ details.objecta ],
 						_objects[ details.objectb ],
@@ -747,85 +747,85 @@ var physijs_worker_functions = function(sceneOnMessage){
 						true
 					);
 				}
-				
+			
 				Ammo.destroy(transforma);
 				if (transformb != undefined) {
 					Ammo.destroy(transformb);	
 				}
 				break;
-			
+		
 			case 'conetwist':
 				var transforma, transformb;
-				
+			
 				transforma = new Ammo.btTransform();
 				transforma.setIdentity();
-				
+			
 				transformb = new Ammo.btTransform();
 				transformb.setIdentity();
-				
+			
 				_vec3_1.setX(details.positiona.x);
 				_vec3_1.setY(details.positiona.y);
 				_vec3_1.setZ(details.positiona.z);
-				
+			
 				_vec3_2.setX(details.positionb.x);
 				_vec3_2.setY(details.positionb.y);
 				_vec3_2.setZ(details.positionb.z);
-				
+			
 				transforma.setOrigin(_vec3_1);
 				transformb.setOrigin(_vec3_2);
-				
+			
 				var rotation = transforma.getRotation();
 				rotation.setEulerZYX( -details.axisa.z, -details.axisa.y, -details.axisa.x );
 				transforma.setRotation( rotation );
-				
+			
 				rotation = transformb.getRotation();
 				rotation.setEulerZYX( -details.axisb.z, -details.axisb.y, -details.axisb.x );
 				transformb.setRotation( rotation );
-				
+			
 				constraint = new Ammo.btConeTwistConstraint(
 					_objects[ details.objecta ],
 					_objects[ details.objectb ],
 					transforma,
 					transformb
 				);
-				
+			
 				constraint.setLimit( Math.PI, 0, Math.PI );
-				
+			
 				Ammo.destroy(transforma);
 				Ammo.destroy(transformb);	
-				
-				break;
 			
+				break;
+		
 			case 'dof':
 				var transforma, transformb, rotation;
-			
+		
 				transforma = new Ammo.btTransform();
 				transforma.setIdentity();
-				
+			
 				_vec3_1.setX(details.positiona.x);
 				_vec3_1.setY(details.positiona.y);
 				_vec3_1.setZ(details.positiona.z);
-				
+			
 				transforma.setOrigin(_vec3_1 );
-				
+			
 				rotation = transforma.getRotation();
 				rotation.setEulerZYX( -details.axisa.z, -details.axisa.y, -details.axisa.x );
 				transforma.setRotation( rotation );
-				
+			
 				if ( details.objectb ) {
 					transformb = new Ammo.btTransform();
 					transformb.setIdentity();
-					
+				
 					_vec3_2.setX(details.positionb.x);
 					_vec3_2.setY(details.positionb.y);
 					_vec3_2.setZ(details.positionb.z);
-					
+				
 					transformb.setOrigin(_vec3_2);
-					
+				
 					rotation = transformb.getRotation();
 					rotation.setEulerZYX( -details.axisb.z, -details.axisb.y, -details.axisb.x );
 					transformb.setRotation( rotation );
-					
+				
 					constraint = new Ammo.btGeneric6DofConstraint(
 						_objects[ details.objecta ],
 						_objects[ details.objectb ],
@@ -843,12 +843,12 @@ var physijs_worker_functions = function(sceneOnMessage){
 					Ammo.destroy(transformb);	
 				}
 				break;
-			
+		
 			default:
 				return;
-			
-		};
 		
+		};
+	
 		world.addConstraint( constraint );
 
 		constraint.enableFeedback();
@@ -882,7 +882,7 @@ var physijs_worker_functions = function(sceneOnMessage){
 	public_functions.simulate = function simulate( params ) {
 		if ( world ) {
 			params = params || {};
-			
+		
 			if ( !params.timeStep ) {
 				if ( last_simulation_time ) {
 					params.timeStep = 0;
@@ -902,12 +902,12 @@ var physijs_worker_functions = function(sceneOnMessage){
 
 			last_simulation_duration = Date.now();
 			world.stepSimulation( params.timeStep, params.maxSubSteps, fixedTimeStep );
-			
+		
 			reportVehicles();
 			reportCollisions();
 			reportConstraints();
 			reportWorld();
-			
+		
 			last_simulation_duration = ( Date.now() - last_simulation_duration ) / 1000;
 			last_simulation_time = Date.now();
 		}
@@ -937,7 +937,7 @@ var physijs_worker_functions = function(sceneOnMessage){
 		var constraint = _constraints[ params.constraint ];
 		constraint.setLowerLinLimit( params.lin_lower || 0 );
 		constraint.setUpperLinLimit( params.lin_upper || 0 );
-		
+	
 		constraint.setLowerAngLimit( params.ang_lower || 0 );
 		constraint.setUpperAngLimit( params.ang_upper || 0 );
 	};
@@ -999,14 +999,14 @@ var physijs_worker_functions = function(sceneOnMessage){
 	};
 	public_functions.conetwist_setMotorTarget = function( params ) {
 		var constraint = _constraints[ params.constraint ];
-		
+	
 		_quat.setX(params.x);
 		_quat.setY(params.y);
 		_quat.setZ(params.z);
 		_quat.setW(params.w);
-		
+	
 		constraint.setMotorTarget(_quat);
-		
+	
 		constraint.getRigidBodyA().activate();
 		constraint.getRigidBodyB().activate();
 	};
@@ -1019,13 +1019,13 @@ var physijs_worker_functions = function(sceneOnMessage){
 
 	public_functions.dof_setLinearLowerLimit = function( params ) {
 		var constraint = _constraints[ params.constraint ];
-		
+	
 		_vec3_1.setX(params.x);
 		_vec3_1.setY(params.y);
 		_vec3_1.setZ(params.z);
-		
+	
 		constraint.setLinearLowerLimit(_vec3_1);
-		
+	
 		constraint.getRigidBodyA().activate();
 		if ( constraint.getRigidBodyB() ) {
 			constraint.getRigidBodyB().activate();
@@ -1033,11 +1033,11 @@ var physijs_worker_functions = function(sceneOnMessage){
 	};
 	public_functions.dof_setLinearUpperLimit = function( params ) {
 		var constraint = _constraints[ params.constraint ];
-		
+	
 		_vec3_1.setX(params.x);
 		_vec3_1.setY(params.y);
 		_vec3_1.setZ(params.z);
-		
+	
 		constraint.setLinearUpperLimit(_vec3_1);
 
 		constraint.getRigidBodyA().activate();
@@ -1047,13 +1047,13 @@ var physijs_worker_functions = function(sceneOnMessage){
 	};
 	public_functions.dof_setAngularLowerLimit = function( params ) {
 		var constraint = _constraints[ params.constraint ];
-		
+	
 		_vec3_1.setX(params.x);
 		_vec3_1.setY(params.y);
 		_vec3_1.setZ(params.z);
-		
+	
 		constraint.setAngularLowerLimit(_vec3_1);
-		
+	
 		constraint.getRigidBodyA().activate();
 		if ( constraint.getRigidBodyB() ) {											
 			constraint.getRigidBodyB().activate();
@@ -1061,13 +1061,13 @@ var physijs_worker_functions = function(sceneOnMessage){
 	};
 	public_functions.dof_setAngularUpperLimit = function( params ) {
 		var constraint = _constraints[ params.constraint ];
-		
+	
 		_vec3_1.setX(params.x);
 		_vec3_1.setY(params.y);
 		_vec3_1.setZ(params.z);
-		
+	
 		constraint.setAngularUpperLimit(_vec3_1);
-		
+	
 		constraint.getRigidBodyA().activate();
 		if ( constraint.getRigidBodyB() ) {
 			constraint.getRigidBodyB().activate();
@@ -1075,10 +1075,10 @@ var physijs_worker_functions = function(sceneOnMessage){
 	};
 	public_functions.dof_enableAngularMotor = function( params ) {
 		var constraint = _constraints[ params.constraint ];
-		
+	
 		var motor = constraint.getRotationalLimitMotor( params.which );
 		motor.set_m_enableMotor( true );
-		
+	
 		constraint.getRigidBodyA().activate();
 		if ( constraint.getRigidBodyB() ) {
 			constraint.getRigidBodyB().activate();
@@ -1086,14 +1086,14 @@ var physijs_worker_functions = function(sceneOnMessage){
 	};
 	public_functions.dof_configureAngularMotor = function( params ) {
 		var constraint = _constraints[ params.constraint ];
-		
+	
 		var motor = constraint.getRotationalLimitMotor( params.which );
-		
+	
 		motor.set_m_loLimit( params.low_angle );
 		motor.set_m_hiLimit( params.high_angle );
 		motor.set_m_targetVelocity( params.velocity );
 		motor.set_m_maxMotorForce( params.max_force );
-		
+	
 		constraint.getRigidBodyA().activate();
 		if ( constraint.getRigidBodyB() ) {
 			constraint.getRigidBodyB().activate();
@@ -1101,10 +1101,10 @@ var physijs_worker_functions = function(sceneOnMessage){
 	};
 	public_functions.dof_disableAngularMotor = function( params ) {
 		var constraint = _constraints[ params.constraint ];
-		
+	
 		var motor = constraint.getRotationalLimitMotor( params.which );
 		motor.set_m_enableMotor( false );
-		
+	
 		constraint.getRigidBodyA().activate();
 		if ( constraint.getRigidBodyB() ) {
 			constraint.getRigidBodyB().activate();
@@ -1116,7 +1116,7 @@ var physijs_worker_functions = function(sceneOnMessage){
 			transform, origin, rotation, 
 			offset = 0,
 			i = 0;
-		
+	
 		if ( SUPPORT_TRANSFERABLE ) {
 			if ( worldreport.length < 2 + _num_objects * WORLDREPORT_ITEMSIZE ) {
 				worldreport = new Float32Array(
@@ -1126,55 +1126,55 @@ var physijs_worker_functions = function(sceneOnMessage){
 				worldreport[0] = MESSAGE_TYPES.WORLDREPORT;
 			}
 		}
-		
+	
 		worldreport[1] = _num_objects; // record how many objects we're reporting on
 
 		//for ( i = 0; i < worldreport[1]; i++ ) {
 		for ( index in _objects ) {
 			if ( _objects.hasOwnProperty( index ) ) {
 				object = _objects[index];
-				
+			
 				// #TODO: we can't use center of mass transform when center of mass can change,
 				//        but getMotionState().getWorldTransform() screws up on objects that have been moved
 				//object.getMotionState().getWorldTransform( transform );
 				transform = object.getCenterOfMassTransform(); 
-				
+			
 				origin = transform.getOrigin(); 
 				rotation = transform.getRotation();
-				
+			
 				// add values to report
 				offset = 2 + (i++) * WORLDREPORT_ITEMSIZE;
-				
+			
 				worldreport[ offset ] = object.id;
-				
+			
 				worldreport[ offset + 1 ] = origin.x();
 				worldreport[ offset + 2 ] = origin.y();
 				worldreport[ offset + 3 ] = origin.z();
-				
+			
 				worldreport[ offset + 4 ] = rotation.x();
 				worldreport[ offset + 5 ] = rotation.y();
 				worldreport[ offset + 6 ] = rotation.z();
 				worldreport[ offset + 7 ] = rotation.w();
-				
+			
 				_vector = object.getLinearVelocity();
 				worldreport[ offset + 8 ] = _vector.x();
 				worldreport[ offset + 9 ] = _vector.y();
 				worldreport[ offset + 10 ] = _vector.z();
-				
+			
 				_vector = object.getAngularVelocity();
 				worldreport[ offset + 11 ] = _vector.x();
 				worldreport[ offset + 12 ] = _vector.y();
 				worldreport[ offset + 13 ] = _vector.z();
 			}
 		}
-		
-		
+	
+	
 		if ( SUPPORT_TRANSFERABLE ) {
 			transferableMessage( worldreport.buffer, [worldreport.buffer] );
 		} else {
 			transferableMessage( worldreport );
 		}
-		
+	
 	};
 
 	reportCollisions = function() {
@@ -1183,7 +1183,7 @@ var physijs_worker_functions = function(sceneOnMessage){
 			num = dp.getNumManifolds(),
 			manifold, num_contacts, j, pt,
 			_collided = false;
-		
+	
 		if ( SUPPORT_TRANSFERABLE ) {
 			if ( collisionreport.length < 2 + num * COLLISIONREPORT_ITEMSIZE ) {
 				collisionreport = new Float32Array(
@@ -1193,17 +1193,17 @@ var physijs_worker_functions = function(sceneOnMessage){
 				collisionreport[0] = MESSAGE_TYPES.COLLISIONREPORT;
 			}
 		}
-		
+	
 		collisionreport[1] = 0; // how many collisions we're reporting on
-		
+	
 		for ( i = 0; i < num; i++ ) {
 			manifold = dp.getManifoldByIndexInternal( i );
-			
+		
 			num_contacts = manifold.getNumContacts();
 			if ( num_contacts === 0 ) {
 				continue;
 			}
-			
+		
 			for ( j = 0; j < num_contacts; j++ ) {
 				pt = manifold.getContactPoint( j );
 				//if ( pt.getDistance() < 0 ) {
@@ -1212,13 +1212,13 @@ var physijs_worker_functions = function(sceneOnMessage){
 					collisionreport[ offset + 1 ] = _objects_ammo[ manifold.getBody1() ];
 					break;
 				//}
-					
+				
 					transferableMessage( _objects_ammo );	
-			
+		
 			}	
 		}
-		
-		
+	
+	
 		if ( SUPPORT_TRANSFERABLE ) {
 			transferableMessage( collisionreport.buffer, [collisionreport.buffer] );
 		} else {
@@ -1275,7 +1275,7 @@ var physijs_worker_functions = function(sceneOnMessage){
 
 			}
 		}
-		
+	
 		if ( j !== 0 ) {
 			if ( SUPPORT_TRANSFERABLE ) {
 				transferableMessage( vehiclereport.buffer, [vehiclereport.buffer] );
@@ -1321,7 +1321,7 @@ var physijs_worker_functions = function(sceneOnMessage){
 			}
 		}
 
-		
+	
 		if ( i !== 0 ) {
 			if ( SUPPORT_TRANSFERABLE ) {
 				transferableMessage( constraintreport.buffer, [constraintreport.buffer] );
@@ -1329,14 +1329,14 @@ var physijs_worker_functions = function(sceneOnMessage){
 				transferableMessage( constraintreport );
 			}
 		}
-		
+	
 	};
 
-	public_functions.onmessage = function( event ) {
-		
+	var onmessage = function( event ) {
+	
 		if ( event.data instanceof Float32Array ) {
 			// transferable object
-			
+		
 			switch ( event.data[0] ) {
 				case MESSAGE_TYPES.WORLDREPORT:
 					worldreport = new Float32Array( event.data );
@@ -1354,18 +1354,19 @@ var physijs_worker_functions = function(sceneOnMessage){
 					constraintreport = new Float32Array( event.data );
 					break;
 			}
-			
+		
 			return;
 		}
-		
+	
 		if ( event.data.cmd && public_functions[event.data.cmd] ) {
 			//if ( event.data.params.id !== undefined && _objects[event.data.params.id] === undefined && event.data.cmd !== 'addObject' && event.data.cmd !== 'registerMaterial' ) return;
 			public_functions[event.data.cmd]( event.data.params );
 		}
-		
+	
 	};
 	
-	return public_functions;
+	return {
+		sceneToWorkerMessageHandler: onmessage
+	};
 };
 
-if (typeof(module) !== 'undefined' && typeof(module.exports) !== 'undefined') { module.exports = physijs_worker_functions; }
